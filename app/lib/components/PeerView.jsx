@@ -589,7 +589,9 @@ export default class PeerView extends React.Component
 	{
 		const { faceDetection } = this.props;
 
-		if (this._audioTrack === audioTrack && this._videoTrack === videoTrack)
+		if (this._audioTrack === audioTrack && 
+			this._videoTrack === videoTrack &&
+			this._screenCaptureTrack === screenCaptureTrack)
 			return;
 
 		this._audioTrack = audioTrack;
