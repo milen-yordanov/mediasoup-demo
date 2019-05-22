@@ -27,6 +27,7 @@ class Me extends React.Component
 			me,
 			audioProducer,
 			videoProducer,
+			screenCaptureProducer,
 			faceDetection,
 			onSetStatsPeerId
 		} = this.props;
@@ -58,7 +59,18 @@ class Me extends React.Component
 		else
 			changeWebcamState = 'unsupported';
 
+		let screenCaptureState;
+
+		if (!me.canSendWebcam)
+			screenCaptureState = 'unsupported';
+		else if (screenCaptureProducer)
+			screenCaptureState = 'on';
+		else
+			screenCaptureState = 'off';
+
 		const videoVisible = Boolean(videoProducer) && !videoProducer.paused;
+		const screenCaptureVisible = Boolean(screenCaptureProducer) && 
+										!screenCaptureProducer.paused;
 
 		let tip;
 
@@ -109,6 +121,23 @@ class Me extends React.Component
 							})}
 							onClick={() => roomClient.changeWebcam()}
 						/>
+
+						<div
+							className={classnames('button', 'webcam', screenCaptureState, {
+								disabled : me.webcamInProgress
+							})}
+							onClick={() =>
+							{
+								if (screenCaptureState === 'on')
+								{
+									roomClient.disableScreenCapture();
+								}
+								else
+								{
+									roomClient.enableScreenCapture();
+								}
+							}}
+						/>
 					</div>
 				</If>
 
@@ -117,15 +146,21 @@ class Me extends React.Component
 					peer={me}
 					audioProducerId={audioProducer ? audioProducer.id : null}
 					videoProducerId={videoProducer ? videoProducer.id : null}
+					screenCaptureProducerId={screenCaptureProducer ? screenCaptureProducer.id : null}
 					audioRtpParameters={audioProducer ? audioProducer.rtpParameters : null}
 					videoRtpParameters={videoProducer ? videoProducer.rtpParameters : null}
+					screenCaptureRtpParameters={screenCaptureProducer ? screenCaptureProducer.rtpParameters : null}
 					audioTrack={audioProducer ? audioProducer.track : null}
 					videoTrack={videoProducer ? videoProducer.track : null}
+					screenCaptureTrack={screenCaptureProducer ? screenCaptureProducer.track : null}
 					videoVisible={videoVisible}
+					screenCaptureVisible={screenCaptureVisible}
 					audioCodec={audioProducer ? audioProducer.codec : null}
 					videoCodec={videoProducer ? videoProducer.codec : null}
+					screenCaptureCodec={screenCaptureProducer ? screenCaptureProducer.codec : null}
 					audioScore={audioProducer ? audioProducer.score : null}
 					videoScore={videoProducer ? videoProducer.score : null}
+					screenCaptureScore={screenCaptureProducer ? screenCaptureProducer.score : null}
 					faceDetection={faceDetection}
 					onChangeDisplayName={(displayName) =>
 					{
@@ -176,13 +211,14 @@ class Me extends React.Component
 
 Me.propTypes =
 {
-	roomClient       : PropTypes.any.isRequired,
-	connected        : PropTypes.bool.isRequired,
-	me               : appPropTypes.Me.isRequired,
-	audioProducer    : appPropTypes.Producer,
-	videoProducer    : appPropTypes.Producer,
-	faceDetection    : PropTypes.bool.isRequired,
-	onSetStatsPeerId : PropTypes.func.isRequired
+	roomClient            : PropTypes.any.isRequired,
+	connected             : PropTypes.bool.isRequired,
+	me                    : appPropTypes.Me.isRequired,
+	audioProducer         : appPropTypes.Producer,
+	videoProducer         : appPropTypes.Producer,
+	screenCaptureProducer : appPropTypes.Producer,
+	faceDetection         : PropTypes.bool.isRequired,
+	onSetStatsPeerId      : PropTypes.func.isRequired
 };
 
 const mapStateToProps = (state) =>
@@ -190,15 +226,23 @@ const mapStateToProps = (state) =>
 	const producersArray = Object.values(state.producers);
 	const audioProducer =
 		producersArray.find((producer) => producer.track.kind === 'audio');
-	const videoProducer =
-		producersArray.find((producer) => producer.track.kind === 'video');
+
+	const videoProducers = 
+		producersArray.filter((producer) => producer.track.kind === 'video');
+
+	const videoProducer = 
+		videoProducers.length > 0 ? videoProducers[0] : null;
+
+	const screenCaptureProducer = 
+		videoProducers.length > 1 ? videoProducers[1] : null;
 
 	return {
-		connected     : state.room.state === 'connected',
-		me            : state.me,
-		audioProducer : audioProducer,
-		videoProducer : videoProducer,
-		faceDetection : state.room.faceDetection
+		connected             : state.room.state === 'connected',
+		me                    : state.me,
+		audioProducer         : audioProducer,
+		videoProducer         : videoProducer,
+		screenCaptureProducer : screenCaptureProducer,
+		faceDetection         : state.room.faceDetection
 	};
 };
 

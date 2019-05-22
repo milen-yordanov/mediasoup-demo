@@ -1670,7 +1670,7 @@ export default class RoomClient
 				{
 					id            : this._screenCaptureProducer.id,
 					deviceLabel   : device.label,
-					type          : 'screen-capture',
+					type          : 'front',
 					paused        : this._screenCaptureProducer.paused,
 					track         : this._screenCaptureProducer.track,
 					rtpParameters : this._screenCaptureProducer.rtpParameters,
