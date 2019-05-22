@@ -123,7 +123,7 @@ class Me extends React.Component
 						/>
 
 						<div
-							className={classnames('button', 'webcam', screenCaptureState, {
+							className={classnames('button', 'screen-capture', screenCaptureState, {
 								disabled : me.webcamInProgress
 							})}
 							onClick={() =>
