@@ -13,6 +13,7 @@ const Peer = (props) =>
 		peer,
 		audioConsumer,
 		videoConsumer,
+		screenCaptureConsumer,
 		audioMuted,
 		faceDetection,
 		onSetStatsPeerId
@@ -28,6 +29,12 @@ const Peer = (props) =>
 		Boolean(videoConsumer) &&
 		!videoConsumer.locallyPaused &&
 		!videoConsumer.remotelyPaused
+	);
+
+	const screenCaptureVisible = (
+		Boolean(screenCaptureConsumer) &&
+		!screenCaptureConsumer.locallyPaused &&
+		!screenCaptureConsumer.remotelyPaused
 	);
 
 	return (
@@ -46,8 +53,10 @@ const Peer = (props) =>
 				peer={peer}
 				audioConsumerId={audioConsumer ? audioConsumer.id : null}
 				videoConsumerId={videoConsumer ? videoConsumer.id : null}
+				screenCaptureConsumerId={screenCaptureConsumer ? screenCaptureConsumer.id : null}
 				audioRtpParameters={audioConsumer ? audioConsumer.rtpParameters : null}
 				videoRtpParameters={videoConsumer ? videoConsumer.rtpParameters : null}
+				screenCaptureRtpParameters={screenCaptureConsumer ? screenCaptureConsumer.rtpParameters : null}
 				consumerSpatialLayers={videoConsumer ? videoConsumer.spatialLayers : null}
 				consumerTemporalLayers={videoConsumer ? videoConsumer.temporalLayers : null}
 				consumerCurrentSpatialLayer={
@@ -64,13 +73,17 @@ const Peer = (props) =>
 				}
 				audioTrack={audioConsumer ? audioConsumer.track : null}
 				videoTrack={videoConsumer ? videoConsumer.track : null}
+				screenCaptureTrack={screenCaptureConsumer ? screenCaptureConsumer.track : null}
 				audioMuted={audioMuted}
 				videoVisible={videoVisible}
+				screenCaptureVisible={screenCaptureVisible}
 				videoMultiLayer={videoConsumer && videoConsumer.type !== 'simple'}
 				audioCodec={audioConsumer ? audioConsumer.codec : null}
 				videoCodec={videoConsumer ? videoConsumer.codec : null}
+				screenCaptureCodec={screenCaptureConsumer ? screenCaptureConsumer.codec : null}
 				audioScore={audioConsumer ? audioConsumer.score : null}
 				videoScore={videoConsumer ? videoConsumer.score : null}
+				screenCaptureScore={screenCaptureConsumer ? screenCaptureConsumer.score : null}
 				faceDetection={faceDetection}
 				onChangeVideoPreferredLayers={(spatialLayer, temporalLayer) =>
 				{
@@ -89,13 +102,14 @@ const Peer = (props) =>
 
 Peer.propTypes =
 {
-	roomClient       : PropTypes.any.isRequired,
-	peer             : appPropTypes.Peer.isRequired,
-	audioConsumer    : appPropTypes.Consumer,
-	videoConsumer    : appPropTypes.Consumer,
-	audioMuted       : PropTypes.bool,
-	faceDetection    : PropTypes.bool.isRequired,
-	onSetStatsPeerId : PropTypes.func.isRequired
+	roomClient            : PropTypes.any.isRequired,
+	peer                  : appPropTypes.Peer.isRequired,
+	audioConsumer         : appPropTypes.Consumer,
+	videoConsumer         : appPropTypes.Consumer,
+	screenCaptureConsumer : appPropTypes.Consumer,
+	audioMuted            : PropTypes.bool,
+	faceDetection         : PropTypes.bool.isRequired,
+	onSetStatsPeerId      : PropTypes.func.isRequired
 };
 
 const mapStateToProps = (state, { id }) =>
@@ -106,13 +120,20 @@ const mapStateToProps = (state, { id }) =>
 		.map((consumerId) => state.consumers[consumerId]);
 	const audioConsumer =
 		consumersArray.find((consumer) => consumer.track.kind === 'audio');
+
+	const videoConsumers = consumersArray.filter((consumer) => consumer.track.kind === 'video');
+
 	const videoConsumer =
-		consumersArray.find((consumer) => consumer.track.kind === 'video');
+		videoConsumers.length > 0 ? videoConsumers[0] : null;
+		
+	const screenCaptureConsumer =
+		videoConsumers.length > 1 ? videoConsumers[1] : null;
 
 	return {
 		peer,
 		audioConsumer,
 		videoConsumer,
+		screenCaptureConsumer,
 		audioMuted    : me.audioMuted,
 		faceDetection : state.room.faceDetection
 	};
