@@ -26,13 +26,15 @@ export default class PeerView extends React.Component
 
 		this.state =
 		{
-			audioVolume           : 0, // Integer from 0 to 10.,
-			showInfo              : window.SHOW_INFO || false,
-			videoResolutionWidth  : null,
-			videoResolutionHeight : null,
-			videoCanPlay          : false,
-			videoElemPaused       : false,
-			maxSpatialLayer       : null
+			audioVolume             : 0, // Integer from 0 to 10.,
+			showInfo                : window.SHOW_INFO || false,
+			videoResolutionWidth    : null,
+			videoResolutionHeight   : null,
+			videoCanPlay            : false,
+			videoElemPaused         : false,
+			screenCaptureCanPlay    : false,
+			screenCaptureElemPaused : false,
+			maxSpatialLayer         : null
 		};
 
 		// Latest received video track.
@@ -42,6 +44,10 @@ export default class PeerView extends React.Component
 		// Latest received video track.
 		// @type {MediaStreamTrack}
 		this._videoTrack = null;
+
+		// Latest received screenCapture track.
+		// @type {MediaStreamTrack}
+		this._screenCaptureTrack = null;
 
 		// Hark instance.
 		// @type {Object}
@@ -61,9 +67,12 @@ export default class PeerView extends React.Component
 			peer,
 			audioProducerId,
 			videoProducerId,
+			screenCaptureProducerId,
 			audioConsumerId,
 			videoConsumerId,
+			screenCaptureConsumerId,
 			videoRtpParameters,
+			// screenCaptureRtpParameters,
 			consumerSpatialLayers,
 			consumerTemporalLayers,
 			consumerCurrentSpatialLayer,
@@ -72,11 +81,14 @@ export default class PeerView extends React.Component
 			consumerPreferredTemporalLayer,
 			audioMuted,
 			videoVisible,
+			screenCaptureVisible,
 			videoMultiLayer,
 			audioCodec,
 			videoCodec,
+			screenCaptureCodec,
 			audioScore,
 			videoScore,
+			screenCaptureScore,
 			onChangeDisplayName,
 			onChangeMaxSendingSpatialLayer,
 			onChangeVideoPreferredLayers,
@@ -91,6 +103,8 @@ export default class PeerView extends React.Component
 			videoResolutionHeight,
 			videoCanPlay,
 			videoElemPaused,
+			screenCaptureCanPlay,
+			screenCaptureElemPaused,
 			maxSpatialLayer
 		} = this.state;
 
@@ -359,6 +373,63 @@ export default class PeerView extends React.Component
 								{this._printConsumerScore(videoConsumerId, videoScore)}
 							</If>
 						</If>
+					
+						<If condition={screenCaptureProducerId || screenCaptureConsumerId}>
+							<h1>screen capture</h1>
+
+							<If condition={screenCaptureProducerId}>
+								<p>
+									{'id: '}
+									<span
+										className='copiable'
+										data-tip='Copy screenCapture consumer id to clipboard'
+										onClick={() => clipboardCopy(`"${screenCaptureProducerId}"`)}
+									>
+										{screenCaptureProducerId}
+									</span>
+								</p>
+
+								<ReactTooltip
+									type='light'
+									effect='solid'
+									delayShow={1500}
+									delayHide={50}
+								/>
+							</If>
+
+							<If condition={screenCaptureConsumerId}>
+								<p>
+									{'id: '}
+									<span
+										className='copiable'
+										data-tip='Copy screenCapture consumer id to clipboard'
+										onClick={() => clipboardCopy(`"${screenCaptureConsumerId}"`)}
+									>
+										{screenCaptureConsumerId}
+									</span>
+								</p>
+
+								<ReactTooltip
+									type='light'
+									effect='solid'
+									delayShow={1500}
+									delayHide={50}
+								/>
+							</If>
+
+							<If condition={screenCaptureCodec}>
+								<p>codec: {screenCaptureCodec}</p>
+							</If>
+
+							<If condition={screenCaptureProducerId && screenCaptureScore}>
+								{this._printProducerScore(screenCaptureProducerId, screenCaptureScore)}
+							</If>
+
+							<If condition={screenCaptureConsumerId && screenCaptureScore}>
+								{this._printConsumerScore(screenCaptureConsumerId, screenCaptureScore)}
+							</If>
+						</If>
+					
 					</div>
 
 					<div className={classnames('peer', { 'is-me': isMe })}>
@@ -412,6 +483,20 @@ export default class PeerView extends React.Component
 					controls={false}
 				/>
 
+				<video
+					ref='screenCaptureElem'
+					className={classnames({
+						'is-me'         : isMe,
+						hidden          : !screenCaptureVisible || !screenCaptureCanPlay,
+						'network-error' : (
+							screenCaptureVisible && videoMultiLayer && consumerCurrentSpatialLayer === null
+						)
+					})}
+					autoPlay
+					muted
+					controls={false}
+				/>
+
 				<audio
 					ref='audioElem'
 					autoPlay
@@ -443,9 +528,9 @@ export default class PeerView extends React.Component
 
 	componentDidMount()
 	{
-		const { audioTrack, videoTrack } = this.props;
+		const { audioTrack, videoTrack, screenCaptureTrack } = this.props;
 
-		this._setTracks(audioTrack, videoTrack);
+		this._setTracks(audioTrack, videoTrack, screenCaptureTrack);
 	}
 
 	componentWillUnmount()
@@ -456,13 +541,20 @@ export default class PeerView extends React.Component
 		clearInterval(this._videoResolutionPeriodicTimer);
 		cancelAnimationFrame(this._faceDetectionRequestAnimationFrame);
 
-		const { videoElem } = this.refs;
+		const { videoElem, screenCaptureElem } = this.refs;
 
 		if (videoElem)
 		{
 			videoElem.oncanplay = null;
 			videoElem.onplay = null;
 			videoElem.onpause = null;
+		}
+
+		if (screenCaptureElem)
+		{
+			screenCaptureElem.oncanplay = null;
+			screenCaptureElem.onplay = null;
+			screenCaptureElem.onpause = null;
 		}
 	}
 
@@ -472,7 +564,8 @@ export default class PeerView extends React.Component
 			isMe,
 			audioTrack,
 			videoTrack,
-			videoRtpParameters
+			videoRtpParameters,
+			screenCaptureTrack
 		} = nextProps;
 
 		const { maxSpatialLayer } = this.state;
@@ -489,10 +582,10 @@ export default class PeerView extends React.Component
 			this.setState({ maxSpatialLayer: null });
 		}
 
-		this._setTracks(audioTrack, videoTrack);
+		this._setTracks(audioTrack, videoTrack, screenCaptureTrack);
 	}
 
-	_setTracks(audioTrack, videoTrack)
+	_setTracks(audioTrack, videoTrack, screenCaptureTrack)
 	{
 		const { faceDetection } = this.props;
 
@@ -501,6 +594,7 @@ export default class PeerView extends React.Component
 
 		this._audioTrack = audioTrack;
 		this._videoTrack = videoTrack;
+		this._screenCaptureTrack = screenCaptureTrack;
 
 		if (this._hark)
 			this._hark.stop();
@@ -510,7 +604,7 @@ export default class PeerView extends React.Component
 		if (faceDetection)
 			this._stopFaceDetection();
 
-		const { audioElem, videoElem } = this.refs;
+		const { audioElem, videoElem, screenCaptureElem } = this.refs;
 
 		if (audioTrack)
 		{
@@ -560,6 +654,34 @@ export default class PeerView extends React.Component
 		{
 			videoElem.srcObject = null;
 		}
+
+		if (screenCaptureTrack)
+		{
+			const stream = new MediaStream;
+
+			stream.addTrack(videoTrack);
+			screenCaptureElem.srcObject = stream;
+
+			screenCaptureElem.oncanplay = () => this.setState({ screenCaptureCanPlay: true });
+
+			screenCaptureElem.onplay = () =>
+			{
+				this.setState({ screenCaptureElemPaused: false });
+
+				audioElem.play()
+					.catch((error) => logger.warn('audioElem.play() failed:%o', error));
+			};
+
+			screenCaptureElem.onpause = () => this.setState({ screenCaptureElemPaused: true });
+
+			screenCaptureElem.play()
+				.catch((error) => logger.warn('screenCaptureElem.play() failed:%o', error));
+		}
+		else
+		{
+			screenCaptureElem.srcObject = null;
+		}
+
 	}
 
 	_runHark(stream)
@@ -727,10 +849,13 @@ PeerView.propTypes =
 		[ appPropTypes.Me, appPropTypes.Peer ]).isRequired,
 	audioProducerId                : PropTypes.string,
 	videoProducerId                : PropTypes.string,
+	screenCaptureProducerId        : PropTypes.string,
 	audioConsumerId                : PropTypes.string,
 	videoConsumerId                : PropTypes.string,
+	screenCaptureConsumerId        : PropTypes.string,
 	audioRtpParameters             : PropTypes.object,
 	videoRtpParameters             : PropTypes.object,
+	screenCaptureRtpParameters     : PropTypes.object,
 	consumerSpatialLayers          : PropTypes.number,
 	consumerTemporalLayers         : PropTypes.number,
 	consumerCurrentSpatialLayer    : PropTypes.number,
@@ -739,13 +864,17 @@ PeerView.propTypes =
 	consumerPreferredTemporalLayer : PropTypes.number,
 	audioTrack                     : PropTypes.any,
 	videoTrack                     : PropTypes.any,
+	screenCaptureTrack             : PropTypes.any,
 	audioMuted                     : PropTypes.bool,
 	videoVisible                   : PropTypes.bool.isRequired,
+	screenCaptureVisible           : PropTypes.bool,
 	videoMultiLayer                : PropTypes.bool,
 	audioCodec                     : PropTypes.string,
 	videoCodec                     : PropTypes.string,
+	screenCaptureCodec             : PropTypes.string,
 	audioScore                     : PropTypes.any,
 	videoScore                     : PropTypes.any,
+	screenCaptureScore             : PropTypes.any,
 	faceDetection                  : PropTypes.bool.isRequired,
 	onChangeDisplayName            : PropTypes.func,
 	onChangeMaxSendingSpatialLayer : PropTypes.func,
