@@ -661,7 +661,7 @@ export default class PeerView extends React.Component
 		{
 			const stream = new MediaStream;
 
-			stream.addTrack(videoTrack);
+			stream.addTrack(screenCaptureTrack);
 			screenCaptureElem.srcObject = stream;
 
 			screenCaptureElem.oncanplay = () => this.setState({ screenCaptureCanPlay: true });
