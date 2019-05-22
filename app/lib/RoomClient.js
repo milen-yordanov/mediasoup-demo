@@ -135,6 +135,10 @@ export default class RoomClient
 		// @type {mediasoupClient.Producer}
 		this._webcamProducer = null;
 
+		// Screen Capture mediasoup Producer.
+		// @type {mediasoupClient.Producer}
+		this._screenCaptureProducer = null;
+
 		// mediasoup Consumers.
 		// @type {Map<String, mediasoupClient.Consumer>}
 		this._consumers = new Map();
@@ -1602,5 +1606,138 @@ export default class RoomClient
 			throw new Error('video.captureStream() not supported');
 
 		return this._externalVideoStream;
+	}
+
+	async enableScreenCapture()
+	{
+		logger.debug('enableScreenCapture()');
+
+		if (this._screenCaptureProducer)
+			return;
+
+		if (!this._mediasoupDevice.canProduce('video'))
+		{
+			logger.error('enableScreenCapture() | cannot produce video');
+
+			return;
+		}
+
+		let track;
+		let device;
+
+		store.dispatch(
+			stateActions.setWebcamInProgress(true));
+
+		try
+		{
+			if (!this._externalVideo)
+			{
+				device = { label: 'screen capture video' };
+
+				logger.debug('enableScreenCapture() | calling getDisplayMedia()');
+
+				const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+				
+				track = stream.getVideoTracks()[0];
+			}
+			else
+			{
+				device = { label: 'external video' };
+
+				const stream = await this._getExternalVideoStream();
+
+				track = stream.getVideoTracks()[0].clone();
+			}
+
+			if (this._useSimulcast)
+			{
+				this._screenCaptureProducer = await this._sendTransport.produce(
+					{
+						track,
+						encodings    : VIDEO_ENCODINGS,
+						codecOptions :
+						{
+							videoGoogleStartBitrate : 1000
+						}
+					});
+			}
+			else
+			{
+				this._screenCaptureProducer = await this._sendTransport.produce({ track });
+			}
+
+			store.dispatch(stateActions.addProducer(
+				{
+					id            : this._screenCaptureProducer.id,
+					deviceLabel   : device.label,
+					type          : 'screen-capture',
+					paused        : this._screenCaptureProducer.paused,
+					track         : this._screenCaptureProducer.track,
+					rtpParameters : this._screenCaptureProducer.rtpParameters,
+					codec         : this._screenCaptureProducer.rtpParameters.codecs[0].mimeType.split('/')[1]
+				}));
+
+			this._screenCaptureProducer.on('transportclose', () =>
+			{
+				this._screenCaptureProducer = null;
+			});
+
+			this._screenCaptureProducer.on('trackended', () =>
+			{
+				store.dispatch(requestActions.notify(
+					{
+						type : 'error',
+						text : 'ScreenShare disconnected!'
+					}));
+
+				this.disableScreenCapture()
+					.catch(() => {});
+			});
+		}
+		catch (error)
+		{
+			logger.error('enableScreenCapture() | failed:%o', error);
+
+			store.dispatch(requestActions.notify(
+				{
+					type : 'error',
+					text : `Error enabling ScreenCapture: ${error}`
+				}));
+
+			if (track)
+				track.stop();
+		}
+
+		store.dispatch(
+			stateActions.setWebcamInProgress(false));
+	}
+
+	async disableScreenCapture()
+	{
+		logger.debug('disableScreenCapture()');
+
+		if (!this._screenCaptureProducer)
+			return;
+
+		this._screenCaptureProducer.close();
+
+		store.dispatch(
+			stateActions.removeProducer(this._screenCaptureProducer.id));
+
+		try
+		{
+			await this._protoo.request(
+				'closeProducer', { producerId: this._screenCaptureProducer.id });
+		}
+		catch (error)
+		{
+			store.dispatch(requestActions.notify(
+				{
+					type : 'error',
+					text : `Error closing server-side ScreenCapture Producer: ${error}`
+				}));
+		}
+
+		this._screenCaptureProducer = null;
 	}
 }
